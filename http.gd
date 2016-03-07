@@ -7,11 +7,13 @@ var headers=[
 ]
 
 var HTTP = "http://"
+var HTTPS = "https://"
 #TODO http request liefert die response, sollten die errors abgefangen werden?
 #TODO Was machen mit players wie werden sie geupdated siehe board get players problem
 #TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
 #TODO warpper/function für verbindungsaufbau
 #TODO http nicht connected abfrangen?
+#TODO ssl immer port 443???? nicht unbedingt oder?
 
 func _init():
 	pass
@@ -20,39 +22,39 @@ func _ready():
 	pass
 
 func get(adress):
-	var uri_dict = get_link_address_port_path(adress)
-	var http = checkServerConnection(uri_dict["host"], uri_dict["port"])
+	var http = checkServerConnection(adress)
 	
 	# http nicht connected abfrangen?
 	http.request(HTTPClient.METHOD_GET, adress.percent_encode(), headers)
 	return getResponse(http)
 	
 func put(adress,body=""):
-	var uri_dict = get_link_address_port_path(adress)
-	var http = checkServerConnection(uri_dict["host"], uri_dict["port"])
+	var http = checkServerConnection(adress)
 
 	# http nicht connected abfrangen?
 	http.request(HTTPClient.METHOD_PUT, adress.percent_encode(), headers, body)
 	return getResponse(http)
 	
 func delete(adress):
-	var uri_dict = get_link_address_port_path(adress)
-	var http = checkServerConnection(uri_dict["host"], uri_dict["port"])
+	var http = checkServerConnection(adress)
 
 	# http nicht connected abfrangen?
 	http.request(HTTPClient.METHOD_DELETE, adress.percent_encode(), headers)
 	return getResponse(http)
 	
 func post(adress, body=""):
-	var uri_dict = get_link_address_port_path(adress)
-	var http = checkServerConnection(uri_dict["host"], uri_dict["port"])
+	var http = checkServerConnection(adress)
 
 	# http nicht connected abfrangen?
 	http.request(HTTPClient.METHOD_POST, adress.percent_encode(), headers, body)
 	return getResponse(http)
 	
 func get_link_address_port_path(uri):
-	var link = uri.replace("http://", "")
+	var ssl = false
+	# TODO ssl immer port 443???? nicht unbedingt oder?
+	if(uri.begins_with(HTTPS)):
+		ssl = true
+	var link = uri.replace(HTTP, "")
 	var host = link.split("/", true)[0]
 	
 	var adress_port = host.split(":", true)
@@ -72,16 +74,23 @@ func get_link_address_port_path(uri):
 			"uri":uri, 
 			"host":adress,
 			"port":int(port),
-			"path":path
+			"path":path,
+			"ssl":ssl
 			#query missing
 			#fragment missing
 			}
 
-func checkServerConnection(serverAdress,port):
+func checkServerConnection(adress):
+	var uri_dict = get_link_address_port_path(adress)
+	
+	var serverAdress = uri_dict["host"]
+	var port = uri_dict["port"]
+	var ssl = uri_dict["ssl"]
+	
 	var http = HTTPClient.new() # Create the Client
 	
 	http.set_blocking_mode( true ) #wait untl all data is available on response
-	var err = http.connect(serverAdress,port) # Connect to host/port
+	var err = http.connect(serverAdress,port,ssl) # Connect to host/port
 	#print(err)
 	
 	if(!err):
