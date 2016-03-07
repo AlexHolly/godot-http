@@ -52,9 +52,10 @@ func post(adress, body=""):
 func get_link_address_port_path(uri):
 	var ssl = false
 	# TODO ssl immer port 443???? nicht unbedingt oder?
+	var link = uri.replace(HTTP, "")
 	if(uri.begins_with(HTTPS)):
 		ssl = true
-	var link = uri.replace(HTTP, "")
+		link = uri.replace(HTTPS, "")
 	var host = link.split("/", true)[0]
 	
 	var adress_port = host.split(":", true)
@@ -66,9 +67,12 @@ func get_link_address_port_path(uri):
 		port = adress_port[1]
 	
 	var path = uri.replace(adress,"")
-
-	path = uri.replace(HTTP+adress+":"+port,"")
-
+	
+	if(ssl):
+		path = uri.replace(HTTP+adress+":"+port,"")
+	else:
+		path = uri.replace(HTTPS+adress+":"+port,"")
+	
 	#print("request: " + path)
 	return {
 			"uri":uri, 
