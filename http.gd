@@ -1,18 +1,25 @@
 #author https://github.com/AlexHolly
 extends Node
 
-var headers=[
-	"User-Agent: Pirulo/1.0 (Godot)",
-	"Accept: */*"
-]
+var timeout_sec = 2
 
+func headers():
+	return {
+				"User-Agent": "Pirulo/1.0 (Godot)",
+				"Accept": "*/*"
+			}
+
+func dict_to_array(dict):
+	var rs = []
+	for key in dict:
+		rs.append(key + ": " + str(dict[key]))
+	return rs
+	
 var HTTP = "http://"
 var HTTPS = "https://"
 #TODO http request liefert die response, sollten die errors abgefangen werden?
 #TODO Was machen mit players wie werden sie geupdated siehe board get players problem
 #TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
-#TODO warpper/function für verbindungsaufbau
-#TODO http nicht connected abfrangen?
 #TODO ssl immer port 443???? nicht unbedingt oder?
 
 func _init():
@@ -22,33 +29,64 @@ func _ready():
 	pass
 
 func get(adress):
+	var headers = headers()
 	var http = checkServerConnection(adress)
 	
-	# http nicht connected abfrangen?
-	http.request(HTTPClient.METHOD_GET, adress.percent_encode(), headers)
-	return getResponse(http)
+	if(typeof(http)==TYPE_OBJECT):
+		var err = http.request(HTTPClient.METHOD_GET, adress.percent_encode(), dict_to_array(headers))
+		if(err==OK):
+			return getResponse(http)
+	return null
 	
-func put(adress,body=""):
+func put(adress,body=[]):
+	var headers = handle_body(body)
+	
+	if(headers== null):
+		return null
+		
 	var http = checkServerConnection(adress)
-
-	# http nicht connected abfrangen?
-	http.request(HTTPClient.METHOD_PUT, adress.percent_encode(), headers, body)
-	return getResponse(http)
+	if(typeof(http)==TYPE_OBJECT):
+		var err = http.request_raw(HTTPClient.METHOD_PUT, adress.percent_encode(), dict_to_array(headers), body)
+		if(err==OK):
+			return getResponse(http)
+	return null
 	
 func delete(adress):
+	var headers = headers()
+		
 	var http = checkServerConnection(adress)
-
-	# http nicht connected abfrangen?
-	http.request(HTTPClient.METHOD_DELETE, adress.percent_encode(), headers)
-	return getResponse(http)
+	if(typeof(http)==TYPE_OBJECT):
+		var err = http.request(HTTPClient.METHOD_DELETE, adress.percent_encode(), dict_to_array(headers))
+		if(err==OK):
+			return getResponse(http)
+	return null
 	
-func post(adress, body=""):
+func post(adress, body=[]):
+	var headers = handle_body(body)
+	
+	if( headers==null ):
+		return null
+		
 	var http = checkServerConnection(adress)
+	if(typeof(http)==TYPE_OBJECT):
+		var err = http.request_raw(HTTPClient.METHOD_POST, adress.percent_encode(), dict_to_array(headers), body)
+		if(err==OK):
+			return getResponse(http)
+	return null
 
-	# http nicht connected abfrangen?
-	http.request(HTTPClient.METHOD_POST, adress.percent_encode(), headers, body)
-	return getResponse(http)
-	
+func handle_body(body):
+	var headers = headers()
+	if(typeof(body)==TYPE_RAW_ARRAY):
+		headers["Content-Length"] = body.size()
+		headers["Content-Type"] =  "bytestream"
+		print("ist raw array: " + str(body.size()))
+	elif(typeof(body)==TYPE_STRING):
+		headers["Content-Length: "] = body.length()
+		headers["Content-Type"] = "application/json"
+	else:
+		print("unsupported type")
+		return null
+
 func get_link_address_port_path(uri):
 	var ssl = false
 	# TODO ssl immer port 443???? nicht unbedingt oder?
@@ -98,20 +136,25 @@ func checkServerConnection(adress):
 	#print(err)
 	
 	if(!err):
-		#var try = 0
-		#try>= 10 &&
+		var start = OS.get_unix_time()
 		while( http.get_status()==HTTPClient.STATUS_CONNECTING or http.get_status()==HTTPClient.STATUS_RESOLVING):
-			http.poll()
-			#try+=1
-	return http
+			if(OS.get_unix_time()-start>timeout_sec):
+				return HTTPClient.STATUS_CANT_CONNECT
+			else:
+				http.poll()
+		return http
+	else:
+		return HTTPClient.STATUS_CANT_CONNECT
 
 
 func getResponse(http):
 
 	var rs = {}
-	#null or {}?
+	
 	rs["header"] = {}
-	rs["body"] = null
+	rs["body"] = {}
+	rs["code"] = 404
+	
 	# Keep polling until the request is going on
 	while (http.get_status() == HTTPClient.STATUS_REQUESTING):
 		http.poll()
@@ -141,13 +184,13 @@ func getResponse(http):
 			rs["body"] = parse_body_to_var(rb, rs["header"]["content-type"])
 			#print(rs)
 		else:
-			rs["body"] = null
+			rs["body"] = {}
 			#print("maybe chunked or error? chunked transfer not supported")
 		#print("http empfangen")
 		return rs
 	else:
 		print("http.gd - no response")
-		pass
+		return null
 
 func parse_body_to_var(body, content_type):
 	
