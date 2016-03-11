@@ -3,6 +3,14 @@ extends Node
 
 var timeout_sec = 2
 
+var ERR_HEADER = 1
+var ERR_BODY = 2
+var ERR_CONN = 3
+var ERR_REQUEST = 4
+var ERR_RESPONSE = 5
+func error(code):
+	return {"code":code}
+
 func headers():
 	return {
 				"User-Agent": "Pirulo/1.0 (Godot)",
@@ -11,6 +19,7 @@ func headers():
 
 func dict_to_array(dict):
 	var rs = []
+	
 	for key in dict:
 		rs.append(key + ": " + str(dict[key]))
 	return rs
@@ -28,6 +37,23 @@ func _init():
 func _ready():
 	pass
 
+func test(adress, body=""):
+	var headers = handle_body(body)
+	
+	if( headers==ERR_BODY ):
+		return error(ERR_BODY)
+		
+	var http = checkServerConnection(adress)
+	if(typeof(http)==TYPE_OBJECT):
+		#print(body)
+		#print(dict_to_array(headers))
+		var err = http.request(HTTPClient.METHOD_GET, adress.percent_encode(), dict_to_array(headers), body)
+		if(err==OK):
+			return getResponse(http)
+		else:
+			return error(ERR_REQUEST)
+	return error(ERR_CONN)
+
 func get(adress):
 	var headers = headers()
 	var http = checkServerConnection(adress)
@@ -36,20 +62,22 @@ func get(adress):
 		var err = http.request(HTTPClient.METHOD_GET, adress.percent_encode(), dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
-	return null
+	return error(ERR_CONN)
 	
 func put(adress,body=[]):
 	var headers = handle_body(body)
 	
-	if(headers== null):
-		return null
+	if( headers==ERR_BODY ):
+		return error(ERR_BODY)
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
 		var err = http.request_raw(HTTPClient.METHOD_PUT, adress.percent_encode(), dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
-	return null
+		else:
+			return error(ERR_REQUEST)
+	return error(ERR_CONN)
 	
 func delete(adress):
 	var headers = headers()
@@ -59,33 +87,42 @@ func delete(adress):
 		var err = http.request(HTTPClient.METHOD_DELETE, adress.percent_encode(), dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
-	return null
+		else:
+			return error(ERR_REQUEST)
+	return error(ERR_CONN)
 	
 func post(adress, body=[]):
 	var headers = handle_body(body)
 	
-	if( headers==null ):
-		return null
+	if( headers==ERR_BODY ):
+		return error(ERR_BODY)
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
 		var err = http.request_raw(HTTPClient.METHOD_POST, adress.percent_encode(), dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
-	return null
+		else:
+			return error(ERR_REQUEST)
+	return error(ERR_CONN)
 
 func handle_body(body):
 	var headers = headers()
 	if(typeof(body)==TYPE_RAW_ARRAY):
-		headers["Content-Length"] = body.size()
-		headers["Content-Type"] =  "bytestream"
-		print("ist raw array: " + str(body.size()))
+		if(body.size()>0):
+			#headers["Content-Length"] = body.size()
+			headers["Content-Type"] =  "bytestream"
+			print("ist raw array: ")
+		return headers
 	elif(typeof(body)==TYPE_STRING):
-		headers["Content-Length: "] = body.length()
-		headers["Content-Type"] = "application/json"
+		if(body.length()>0):
+			#headers["Content-Length: "] = body.length()
+			headers["Content-Type"] = "application/json"
+			print("ist string: ")
+		return headers
 	else:
 		print("unsupported type")
-		return null
+		return error(ERR_BODY)
 
 func get_link_address_port_path(uri):
 	var ssl = false
@@ -110,7 +147,7 @@ func get_link_address_port_path(uri):
 		path = uri.replace(HTTP+adress+":"+port,"")
 	else:
 		path = uri.replace(HTTPS+adress+":"+port,"")
-	
+	# TODO percent encode nur für params einbauen
 	#print("request: " + path)
 	return {
 			"uri":uri, 
@@ -177,10 +214,10 @@ func getResponse(http):
 		while(http.get_status()==HTTPClient.STATUS_BODY):
 			http.set_read_chunk_size( http.get_response_body_length() )
 			rb += http.read_response_body_chunk()
-			#print(rs)
-			
+		#print(rs)
+		
 		if("content-length" in rs["header"]):
-			print(str("EMPFANGEN LENGHT:", rs["header"]["content-length"]))
+			#print(str("EMPFANGEN LENGHT:", rs["header"]["content-length"]))
 			rs["body"] = parse_body_to_var(rb, rs["header"]["content-type"])
 			#print(rs)
 		else:
@@ -190,14 +227,14 @@ func getResponse(http):
 		return rs
 	else:
 		print("http.gd - no response")
-		return null
+		return error(ERR_RESPONSE)
 
 func parse_body_to_var(body, content_type):
 	
 	if(content_type.find("application/json")!=-1):
 		
 		var bodyDict = {}
-		body = body.get_string_from_ascii()
+		body = body.get_string_from_utf8()
 		
 		#print(body)
 		
