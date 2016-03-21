@@ -1,13 +1,14 @@
 #author https://github.com/AlexHolly
 extends Node
 
-var timeout_sec = 2
+var timeout_sec = 1
 
 var ERR_HEADER = 1
-var ERR_BODY = 2
-var ERR_CONN = 3
-var ERR_REQUEST = 4
-var ERR_RESPONSE = 5
+var ERR_BODY = "Parse Error unsupported body"
+var ERR_CONN = "Connection error, can't reach host"
+var ERR_REQUEST = "Request failed, invalid params?"
+var ERR_RESPONSE = "No response error, No Header?"
+
 func error(code):
 	var rs = {}
 	
@@ -121,22 +122,19 @@ func handle_body(body):
 	if(typeof(body)==TYPE_RAW_ARRAY):
 		if(body.size()>0):
 			headers["Content-Type"] =  "bytestream"
-			print("ist raw array: ")
 		return [headers,body]
 	elif(typeof(body)==TYPE_DICTIONARY):
 		if(!body.empty()):
 			headers["Content-Type"] = "application/json"
 			body = body.to_json()
-			print("ist json: " + body)
 		return [headers,body]
 	elif(typeof(body)==TYPE_STRING):
 		if(body.length()>0):
 			headers["Content-Type"] = "text/plain"
-			print("ist string: ")
 		return [headers,body]
 	else:
 		print("unsupported type")
-		return [headers,body]
+		return [ERR_BODY,ERR_BODY]
 
 func get_link_address_port_path(uri):
 	var ssl = false
@@ -242,7 +240,7 @@ func getResponse(http):
 		return rs
 	else:
 		print("http.gd - no response")
-		return rs
+		return error(ERR_RESPONSE)
 
 func parse_body_to_var(body, content_type):
 	
