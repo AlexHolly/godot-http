@@ -4,11 +4,9 @@ extends Node
 
 var timeout_sec = 1
 
-var ERR_HEADER = 1
 var ERR_BODY = "Parse Error unsupported body"
 var ERR_CONN = "Connection error, can't reach host"
 var ERR_REQUEST = "Request failed, invalid params?"
-var ERR_RESPONSE = "No response error, No Header?"
 
 func error(code):
 	var rs = {}
@@ -210,7 +208,7 @@ func getResponse(http):
 		#print("ich frage die datei an...")
 	
 	rs["code"] = http.get_response_code()
-	# If there is header content
+	# If there is header content(more than first line)
 	if (http.has_response()):
 		# Get response headers
 		var headers = http.get_response_headers_as_dictionary()
@@ -237,8 +235,7 @@ func getResponse(http):
 		#print("http empfangen")
 		return rs
 	else:
-		print("http.gd - no response")
-		return error(ERR_RESPONSE)
+		return rs
 
 func parse_body_to_var(body, content_type):
 	
