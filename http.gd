@@ -1,4 +1,5 @@
-#author https://github.com/AlexHolly
+#author https://github.com/AlexHolly 
+#v0.4
 extends Node
 
 var timeout_sec = 1
@@ -32,12 +33,11 @@ func dict_to_array(dict):
 	
 var HTTP = "http://"
 var HTTPS = "https://"
-# TODO http request liefert die response, sollten die errors abgefangen werden?
+
 # TODO Was machen mit players wie werden sie geupdated siehe board get players problem
 # TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
 # TODO ssl immer port 443???? nicht unbedingt oder?
-# TODO darf get einen body mit geben?
-# TODO translate dictionary to json?
+
 func _init():
 	pass
 	
@@ -52,8 +52,6 @@ func test(adress, body=""):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		#print(body)
-		#print(dict_to_array(headers))
 		var err = http.request(HTTPClient.METHOD_GET, adress.percent_encode(), dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
@@ -71,7 +69,7 @@ func get(adress):
 			return getResponse(http)
 	return error(ERR_CONN)
 	
-func put(adress,body1=[]):
+func put(adress,body1=RawArray()):
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
@@ -81,7 +79,7 @@ func put(adress,body1=[]):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_PUT, adress.percent_encode(), dict_to_array(headers), body)
+		var err = http.request_raw(HTTPClient.METHOD_PUT, adress.percent_encode(), dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
@@ -100,7 +98,7 @@ func delete(adress):
 			return error(ERR_REQUEST)
 	return error(ERR_CONN)
 	
-func post(adress, body1=[]):
+func post(adress, body1=RawArray()):
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
@@ -110,7 +108,7 @@ func post(adress, body1=[]):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_POST, adress.percent_encode(), dict_to_array(headers), body)
+		var err = http.request_raw(HTTPClient.METHOD_POST, adress.percent_encode(), dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
@@ -121,7 +119,7 @@ func handle_body(body):
 	var headers = headers()
 	if(typeof(body)==TYPE_RAW_ARRAY):
 		if(body.size()>0):
-			headers["Content-Type"] =  "bytestream"
+			headers["Content-Type"] = "bytestream"
 		return [headers,body]
 	elif(typeof(body)==TYPE_DICTIONARY):
 		if(!body.empty()):
@@ -249,7 +247,7 @@ func parse_body_to_var(body, content_type):
 		var bodyDict = {}
 		body = body.get_string_from_utf8()
 		
-		print(body)
+		#print(body)
 		
 		if( bodyDict.parse_json( body ) == 0 ):
 			body = bodyDict
@@ -260,6 +258,5 @@ func parse_body_to_var(body, content_type):
 	elif(content_type.find("text/plain")!=-1):
 		body = body.get_string_from_utf8()
 	elif(content_type.find("bytestream")!=-1):
-		
 		pass#return body
 	return body
