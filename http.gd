@@ -50,7 +50,7 @@ func test(adress, body=""):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_GET, adress.percent_encode(), dict_to_array(headers), body)
+		var err = http.request(HTTPClient.METHOD_GET, adress, dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
@@ -62,7 +62,7 @@ func get(adress):
 	var http = checkServerConnection(adress)
 	
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_GET, adress.percent_encode(), dict_to_array(headers))
+		var err = http.request(HTTPClient.METHOD_GET, adress, dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
 	return error(ERR_CONN)
@@ -77,7 +77,7 @@ func put(adress,body1=RawArray()):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request_raw(HTTPClient.METHOD_PUT, adress.percent_encode(), dict_to_array(headers), body)
+		var err = http.request_raw(HTTPClient.METHOD_PUT, adress, dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
@@ -89,7 +89,7 @@ func delete(adress):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_DELETE, adress.percent_encode(), dict_to_array(headers))
+		var err = http.request(HTTPClient.METHOD_DELETE, adress, dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
 		else:
@@ -106,7 +106,7 @@ func post(adress, body1=RawArray()):
 		
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request_raw(HTTPClient.METHOD_POST, adress.percent_encode(), dict_to_array(headers), body)
+		var err = http.request_raw(HTTPClient.METHOD_POST, adress, dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
