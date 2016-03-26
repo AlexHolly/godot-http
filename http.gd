@@ -127,6 +127,7 @@ func handle_body(body):
 	elif(typeof(body)==TYPE_STRING):
 		if(body.length()>0):
 			headers["Content-Type"] = "text/plain"
+			body = body.to_utf8()
 		return [headers,body]
 	else:
 		print("unsupported type")
