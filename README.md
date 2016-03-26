@@ -1,41 +1,47 @@
-TODO:
+#TODO:
 
  - HTTPS not supported
  - sending raw_array not supported by godot master
  - change default transformation not supported
  - changing timeout and pass headers not supported
 
-Errors:
+#Errors:
 
-code is always 404
+code on internal errors is always 404
 
-body contains description
+##body contains description
 
- - "Parse Error unsupported body type"
- - "Connection error, can't reach host"
- - "Request failed, invalid params?"
+	"Parse Error unsupported body type"
+	"Connection error, can't reach host"
+	"Request failed, invalid params?"
 
 
 var response = http.get(uri)
+
 var response = http.put(uri, chunk)
+
 var response = http.post(uri, chunk)
+
 var response = http.delete(uri)
 
-Response is a Dictionary and contains the following fields
+#Response is a Dictionary and contains the following fields
 
 response["code"]
+
 response["headers"]
+
 response["body"]
 
-The body is automatically transformed to an var there are 3 types supported as default
+#The body is automatically transformed to an var there are 3 types supported as default
 
-"application/json" - A Json String, will return a Dictionary 
-"text/plain" - Simple text, will return a String
-"bytestream" - A bytestream, that can contain any data(files,images,..), will return a RawArray()
+	"application/json" - A Json String, will return a Dictionary 
+	"text/plain" - Simple text, will return a String
+	"bytestream" - A bytestream, that can contain any data(files,images,..), will return a RawArray()
 
 You can overwrite the default transformation. This is the default tranformation, it also adds the header.
 You could also just change the default function handle_body.
 
+```
 var default_body_parser = ["handle_body",self]
 
 func handle_body(body):
@@ -56,9 +62,10 @@ func handle_body(body):
 	else:
 		print("unsupported type")
 		return [ERR_BODY,ERR_BODY]
+```
 
-EXAMPLE that only supports json strings:
-
+#EXAMPLE that only supports json strings:
+```
 http.default_body_parser = ["my_body_tranformation",self]
 
 func my_custom_headers():
@@ -77,7 +84,7 @@ func my_body_tranformation(body):
 	else:
 		print("unsupported type")
 		return [http.ERR_BODY,http.ERR_BODY]
-
+```
 Headers don't need the Content-Length header, this is beeing added by godot HTTPClient.
 
 
