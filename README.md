@@ -22,9 +22,9 @@ var http = load("res://http.gd").new()
 
 var response = http.get(uri)
 
-var response = http.put(uri, chunk)
+var response = http.put(uri, body) # body can be String or RawArray
 
-var response = http.post(uri, chunk)
+var response = http.post(uri, body) # body can be String or RawArray
 
 var response = http.delete(uri)
 
