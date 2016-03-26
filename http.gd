@@ -100,7 +100,7 @@ func post(adress, body1=RawArray()):
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
-	
+
 	if( headers==ERR_BODY ):
 		return error(ERR_BODY)
 		
@@ -122,7 +122,7 @@ func handle_body(body):
 	elif(typeof(body)==TYPE_DICTIONARY):
 		if(!body.empty()):
 			headers["Content-Type"] = "application/json"
-			body = body.to_json()
+			body = body.to_json().to_utf8()
 		return [headers,body]
 	elif(typeof(body)==TYPE_STRING):
 		if(body.length()>0):
