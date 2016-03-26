@@ -4,6 +4,7 @@ extends Node
 
 var timeout_sec = 1
 
+var ERR_ADRESS = "Invalid http request, maybe adress is empty?"
 var ERR_BODY = "Parse Error unsupported body"
 var ERR_CONN = "Connection error, can't reach host"
 var ERR_REQUEST = "Request failed, invalid params?"
@@ -58,6 +59,9 @@ func test(adress, body=""):
 	return error(ERR_CONN)
 
 func get(adress):
+	if(adress==""):
+		return error(ERR_ADRESS)
+		
 	var headers = headers()
 	var http = checkServerConnection(adress)
 	
@@ -68,10 +72,15 @@ func get(adress):
 	return error(ERR_CONN)
 	
 func put(adress,body1=RawArray()):
+	if(adress==""):
+		return error(ERR_ADRESS)
+		
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
-	
+	#print(adress)
+	#print(body1)
+	#print(body)
 	if( headers==ERR_BODY ):
 		return error(ERR_BODY)
 		
@@ -84,19 +93,10 @@ func put(adress,body1=RawArray()):
 			return error(ERR_REQUEST)
 	return error(ERR_CONN)
 	
-func delete(adress):
-	var headers = headers()
-		
-	var http = checkServerConnection(adress)
-	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_DELETE, adress, dict_to_array(headers))
-		if(err==OK):
-			return getResponse(http)
-		else:
-			return error(ERR_REQUEST)
-	return error(ERR_CONN)
-	
 func post(adress, body1=RawArray()):
+	if(adress==""):
+		return error(ERR_ADRESS)
+		
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
@@ -107,6 +107,21 @@ func post(adress, body1=RawArray()):
 	var http = checkServerConnection(adress)
 	if(typeof(http)==TYPE_OBJECT):
 		var err = http.request_raw(HTTPClient.METHOD_POST, adress, dict_to_array(headers), body)
+		if(err==OK):
+			return getResponse(http)
+		else:
+			return error(ERR_REQUEST)
+	return error(ERR_CONN)
+	
+func delete(adress):
+	if(adress==""):
+		return error(ERR_ADRESS)
+		
+	var headers = headers()
+		
+	var http = checkServerConnection(adress)
+	if(typeof(http)==TYPE_OBJECT):
+		var err = http.request(HTTPClient.METHOD_DELETE, adress, dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
 		else:
