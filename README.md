@@ -16,6 +16,10 @@ code on internal errors is always 404
 	"Request failed, invalid params?"
 
 
+#How to use
+
+var http = load("res://http.gd").new()
+
 var response = http.get(uri)
 
 var response = http.put(uri, chunk)
