@@ -9,6 +9,8 @@ var ERR_BODY = "Parse Error unsupported body"
 var ERR_CONN = "Connection error, can't reach host"
 var ERR_REQUEST = "Request failed, invalid params?"
 
+var connections = {}
+
 func error(code):
 	var rs = {}
 	
@@ -20,7 +22,8 @@ func error(code):
 func headers():
 	return {
 				"User-Agent": "Pirulo/1.0 (Godot)",
-				"Accept": "*/*"
+				"Accept": "*/*",
+				"connection": "keep-alive"
 			}
 
 func dict_to_array(dict):
@@ -49,9 +52,13 @@ func test(adress, body=""):
 	if( headers==ERR_BODY ):
 		return error(ERR_BODY)
 		
-	var http = checkServerConnection(adress)
+	var http_fullhost = checkServerConnection(adress)
+	var http = http_fullhost[0]
+	var fullhost = http_fullhost[1]
+	
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_GET, adress, dict_to_array(headers), body)
+		var url = http_fullhost[2]
+		var err = http.request(HTTPClient.METHOD_GET, url, dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
@@ -63,12 +70,22 @@ func get(adress):
 		return error(ERR_ADRESS)
 		
 	var headers = headers()
-	var http = checkServerConnection(adress)
 	
+	var http_fullhost = checkServerConnection(adress)
+	var http = http_fullhost[0]
+	var fullhost = http_fullhost[1]
+	
+	#print(adress)
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_GET, adress, dict_to_array(headers))
+		var url = http_fullhost[2]
+		print(url)
+		var err = http.request(HTTPClient.METHOD_GET, url, dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
+		else:
+			connections.erase(fullhost)
+			return error(ERR_REQUEST)
+	connections.erase(fullhost)
 	return error(ERR_CONN)
 	
 func put(adress,body1=RawArray()):
@@ -78,19 +95,23 @@ func put(adress,body1=RawArray()):
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
-	#print(adress)
-	#print(body1)
-	#print(body)
+
 	if( headers==ERR_BODY ):
 		return error(ERR_BODY)
 		
-	var http = checkServerConnection(adress)
+	var http_fullhost = checkServerConnection(adress)
+	var http = http_fullhost[0]
+	var fullhost = http_fullhost[1]
+	
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request_raw(HTTPClient.METHOD_PUT, adress, dict_to_array(headers), body)
+		var url = http_fullhost[2]
+		var err = http.request_raw(HTTPClient.METHOD_PUT, url, dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
+			connections.erase(fullhost)
 			return error(ERR_REQUEST)
+	connections.erase(fullhost)
 	return error(ERR_CONN)
 	
 func post(adress, body1=RawArray()):
@@ -104,13 +125,19 @@ func post(adress, body1=RawArray()):
 	if( headers==ERR_BODY ):
 		return error(ERR_BODY)
 		
-	var http = checkServerConnection(adress)
+	var http_fullhost = checkServerConnection(adress)
+	var http = http_fullhost[0]
+	var fullhost = http_fullhost[1]
+	
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request_raw(HTTPClient.METHOD_POST, adress, dict_to_array(headers), body)
+		var url = http_fullhost[2]
+		var err = http.request_raw(HTTPClient.METHOD_POST, url, dict_to_array(headers), body)
 		if(err==OK):
 			return getResponse(http)
 		else:
+			connections.erase(fullhost)
 			return error(ERR_REQUEST)
+	connections.erase(fullhost)
 	return error(ERR_CONN)
 	
 func delete(adress):
@@ -119,13 +146,19 @@ func delete(adress):
 		
 	var headers = headers()
 		
-	var http = checkServerConnection(adress)
+	var http_fullhost = checkServerConnection(adress)
+	var http = http_fullhost[0]
+	var fullhost = http_fullhost[1]
+	
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request(HTTPClient.METHOD_DELETE, adress, dict_to_array(headers))
+		var url = http_fullhost[2]
+		var err = http.request(HTTPClient.METHOD_DELETE, url, dict_to_array(headers))
 		if(err==OK):
 			return getResponse(http)
 		else:
+			connections.erase(fullhost)
 			return error(ERR_REQUEST)
+	connections.erase(fullhost)
 	return error(ERR_CONN)
 
 func handle_body(body):
@@ -149,45 +182,57 @@ func handle_body(body):
 		return [ERR_BODY,ERR_BODY]
 
 func get_link_address_port_path(uri):
+	var left = ""
+	var link = ""
 	var ssl = false
-	# TODO ssl immer port 443???? nicht unbedingt oder?
-	var link = uri.replace(HTTP, "")
+	
 	if(uri.begins_with(HTTPS)):
 		ssl = true
 		link = uri.replace(HTTPS, "")
-	var host = link.split("/", true)[0]
-	
-	var adress_port = host.split(":", true)
-	var adress = adress_port[0]
-	
-	#kein port also "" führt zu einem freeze
-	var port = "80"
-	if(adress_port.size()>1):
-		port = adress_port[1]
-	
-	var path = uri.replace(adress,"")
-	
-	if(ssl):
-		path = uri.replace(HTTP+adress+":"+port,"")
+		left+=HTTPS
 	else:
-		path = uri.replace(HTTPS+adress+":"+port,"")
-	# TODO percent encode nur für params einbauen
-	#print("request: " + path)
+		link = uri.replace(HTTP, "")
+		left+=HTTP
+		
+	var hostport = link.split("/", true)[0]
+	
+	left+=hostport
+	
+	var host_port = hostport.split(":", true)
+	var host = host_port[0]
+	
+	# TODO ssl immer port 443???? nicht unbedingt oder?
+	# TEST Falls kein port angegeben "" -> führt zu einem freeze 
+	# TODO check if https -> ssl/tls 443
+	var port = "80"
+	if(host_port.size()>1):
+		port = host_port[1]
+	
+	var path = uri.replace(left,"")
+	
 	return {
 			"uri":uri, 
-			"host":adress,
+			"host":host,
 			"port":int(port),
 			"path":path,
-			"ssl":ssl
+			"ssl":ssl,
+			"fullhost":hostport
 			#query missing
 			#fragment missing
 			}
 
 func checkServerConnection(adress):
+
 	var uri_dict = get_link_address_port_path(adress)
 	
 	var serverAdress = uri_dict["host"]
 	var port = uri_dict["port"]
+	var path = uri_dict["path"]
+	var fullhost = uri_dict["fullhost"]
+	
+	if(connections.has(fullhost)):
+		return [connections[fullhost],fullhost]
+		
 	var ssl = uri_dict["ssl"]
 	
 	var http = HTTPClient.new() # Create the Client
@@ -200,12 +245,13 @@ func checkServerConnection(adress):
 		var start = OS.get_unix_time()
 		while( http.get_status()==HTTPClient.STATUS_CONNECTING or http.get_status()==HTTPClient.STATUS_RESOLVING):
 			if(OS.get_unix_time()-start>timeout_sec):
-				return HTTPClient.STATUS_CANT_CONNECT
+				return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
 			else:
 				http.poll()
-		return http
+		connections[fullhost] = http
+		return [http,fullhost,path]
 	else:
-		return HTTPClient.STATUS_CANT_CONNECT
+		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
 
 
 # IF there is no body "" is returned else body
@@ -268,7 +314,7 @@ func parse_body_to_var(body, content_type):
 		else:
 			print("Error beim body to dict json wandel")
 		
-	elif(content_type.find("text/plain")!=-1):
+	elif(content_type.find("text/plain")!=-1||content_type.find("text/html")!=-1):
 		body = body.get_string_from_utf8()
 	elif(content_type.find("bytestream")!=-1):
 		pass#return body
