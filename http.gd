@@ -46,41 +46,45 @@ func _init():
 func _ready():
 	pass
 
-func test(adress, body=""):
-	var headers = handle_body(body)
-	
-	if( headers==ERR_BODY ):
-		return error(ERR_BODY)
-		
-	var http_fullhost = checkServerConnection(adress)
-	var http = http_fullhost[0]
-	var fullhost = http_fullhost[1]
-	
-	if(typeof(http)==TYPE_OBJECT):
-		var url = http_fullhost[2]
-		var err = http.request(HTTPClient.METHOD_GET, url, dict_to_array(headers), body)
-		if(err==OK):
-			return getResponse(http)
-		else:
-			return error(ERR_REQUEST)
-	return error(ERR_CONN)
+#func test(adress, body=""):
+#	var headers = handle_body(body)
+#	
+#	if( headers==ERR_BODY ):
+#		return error(ERR_BODY)
+#		
+#	var http_fullhost = checkServerConnection(adress)
+#	var http = http_fullhost[0]
+#	var fullhost = http_fullhost[1]
+#	
+#	if(typeof(http)==TYPE_OBJECT):
+#		var url = http_fullhost[2]
+#		var err = http.request(HTTPClient.METHOD_GET, url, dict_to_array(headers), body)
+#		if(!err):
+#			return getResponse(http)
+#		else:
+#			return error(ERR_REQUEST)
+#	return error(ERR_CONN)
 
-func get(adress):
+func req(verb,adress,body1):
 	if(adress==""):
 		return error(ERR_ADRESS)
 		
-	var headers = headers()
+	var headers_body = handle_body(body1)
+	var headers = headers_body[0]
+	var body = headers_body[1]
+
+	if( headers==ERR_BODY ):
+		return error(ERR_BODY)
 	
-	var http_fullhost = checkServerConnection(adress)
+	var http_fullhost = checkServerConnection(adress,headers.has("connection"))
 	var http = http_fullhost[0]
 	var fullhost = http_fullhost[1]
 	
 	#print(adress)
 	if(typeof(http)==TYPE_OBJECT):
 		var url = http_fullhost[2]
-		print(url)
-		var err = http.request(HTTPClient.METHOD_GET, url, dict_to_array(headers))
-		if(err==OK):
+		var err = http.request_raw(verb, url, dict_to_array(headers), body)
+		if(!err):
 			return getResponse(http)
 		else:
 			connections.erase(fullhost)
@@ -88,81 +92,21 @@ func get(adress):
 	connections.erase(fullhost)
 	return error(ERR_CONN)
 	
-func put(adress,body1=RawArray()):
-	if(adress==""):
-		return error(ERR_ADRESS)
-		
-	var headers_body = handle_body(body1)
-	var headers = headers_body[0]
-	var body = headers_body[1]
-
-	if( headers==ERR_BODY ):
-		return error(ERR_BODY)
-		
-	var http_fullhost = checkServerConnection(adress)
-	var http = http_fullhost[0]
-	var fullhost = http_fullhost[1]
+func get(adress):
+	return req(HTTPClient.METHOD_GET,adress,RawArray())
 	
-	if(typeof(http)==TYPE_OBJECT):
-		var url = http_fullhost[2]
-		var err = http.request_raw(HTTPClient.METHOD_PUT, url, dict_to_array(headers), body)
-		if(err==OK):
-			return getResponse(http)
-		else:
-			connections.erase(fullhost)
-			return error(ERR_REQUEST)
-	connections.erase(fullhost)
-	return error(ERR_CONN)
+func put(adress,body=RawArray()):
+	return req(HTTPClient.METHOD_PUT,adress,body)
 	
-func post(adress, body1=RawArray()):
-	if(adress==""):
-		return error(ERR_ADRESS)
-		
-	var headers_body = handle_body(body1)
-	var headers = headers_body[0]
-	var body = headers_body[1]
-
-	if( headers==ERR_BODY ):
-		return error(ERR_BODY)
-		
-	var http_fullhost = checkServerConnection(adress)
-	var http = http_fullhost[0]
-	var fullhost = http_fullhost[1]
-	
-	if(typeof(http)==TYPE_OBJECT):
-		var url = http_fullhost[2]
-		var err = http.request_raw(HTTPClient.METHOD_POST, url, dict_to_array(headers), body)
-		if(err==OK):
-			return getResponse(http)
-		else:
-			connections.erase(fullhost)
-			return error(ERR_REQUEST)
-	connections.erase(fullhost)
-	return error(ERR_CONN)
+func post(adress, body=RawArray()):
+	return req(HTTPClient.METHOD_POST,adress,body)
 	
 func delete(adress):
-	if(adress==""):
-		return error(ERR_ADRESS)
-		
-	var headers = headers()
-		
-	var http_fullhost = checkServerConnection(adress)
-	var http = http_fullhost[0]
-	var fullhost = http_fullhost[1]
-	
-	if(typeof(http)==TYPE_OBJECT):
-		var url = http_fullhost[2]
-		var err = http.request(HTTPClient.METHOD_DELETE, url, dict_to_array(headers))
-		if(err==OK):
-			return getResponse(http)
-		else:
-			connections.erase(fullhost)
-			return error(ERR_REQUEST)
-	connections.erase(fullhost)
-	return error(ERR_CONN)
+	return req(HTTPClient.METHOD_DELETE, adress,RawArray())
 
 func handle_body(body):
 	var headers = headers()
+		
 	if(typeof(body)==TYPE_RAW_ARRAY):
 		if(body.size()>0):
 			headers["Content-Type"] = "bytestream"
@@ -221,7 +165,7 @@ func get_link_address_port_path(uri):
 			#fragment missing
 			}
 
-func checkServerConnection(adress):
+func checkServerConnection(adress,is_keep_alive):
 
 	var uri_dict = get_link_address_port_path(adress)
 	
@@ -229,17 +173,17 @@ func checkServerConnection(adress):
 	var port = uri_dict["port"]
 	var path = uri_dict["path"]
 	var fullhost = uri_dict["fullhost"]
-	
-	if(connections.has(fullhost)):
-		return [connections[fullhost],fullhost]
+
+	if(is_keep_alive && connections.has(fullhost)):
+		return [connections[fullhost],fullhost,path]
 		
 	var ssl = uri_dict["ssl"]
 	
 	var http = HTTPClient.new() # Create the Client
 	
 	http.set_blocking_mode( true ) #wait untl all data is available on response
+
 	var err = http.connect(serverAdress,port,ssl) # Connect to host/port
-	#print(err)
 	
 	if(!err):
 		var start = OS.get_unix_time()
@@ -248,7 +192,8 @@ func checkServerConnection(adress):
 				return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
 			else:
 				http.poll()
-		connections[fullhost] = http
+		if(is_keep_alive):
+			connections[fullhost] = http
 		return [http,fullhost,path]
 	else:
 		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
@@ -270,22 +215,27 @@ func getResponse(http):
 		#print("ich frage die datei an...")
 	
 	rs["code"] = http.get_response_code()
+	
+	#print(http.get_response_headers())
 	# If there is header content(more than first line)
 	if (http.has_response()):
 		# Get response headers
 		var headers = http.get_response_headers_as_dictionary()
+		
 		for key in headers:
 			rs["header"][key.to_lower()] = headers[key]
-
+		#rs["code"] = http.get_response_code()
 		#print(rs)
 		var cache = headers
 		#This method works for both anyway
 		var rb = RawArray() #array that will hold the data
 		
+		#print(http.get_response_body_length())
 		while(http.get_status()==HTTPClient.STATUS_BODY):
 			http.set_read_chunk_size( http.get_response_body_length() )
 			rb += http.read_response_body_chunk()
-		#print(rs)
+		#rb += http.read_response_body_chunk()
+		#print(http.get_status())
 		#print(rb.get_string_from_utf8())
 		if("content-length" in rs["header"]):
 			#print(str("EMPFANGEN LENGHT:", rs["header"]["content-length"]))
@@ -295,8 +245,10 @@ func getResponse(http):
 			rs["body"] = ""
 			#print("maybe chunked or error? chunked transfer not supported")
 		#print("http empfangen")
+		#print(rs)
 		return rs
 	else:
+		#print(rs)
 		return rs
 
 func parse_body_to_var(body, content_type):
