@@ -40,31 +40,6 @@ var HTTPS = "https://"
 # TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
 # TODO ssl immer port 443???? nicht unbedingt oder?
 
-func _init():
-	pass
-	
-func _ready():
-	pass
-
-#func test(adress, body=""):
-#	var headers = handle_body(body)
-#	
-#	if( headers==ERR_BODY ):
-#		return error(ERR_BODY)
-#		
-#	var http_fullhost = checkServerConnection(adress)
-#	var http = http_fullhost[0]
-#	var fullhost = http_fullhost[1]
-#	
-#	if(typeof(http)==TYPE_OBJECT):
-#		var url = http_fullhost[2]
-#		var err = http.request(HTTPClient.METHOD_GET, url, dict_to_array(headers), body)
-#		if(!err):
-#			return getResponse(http)
-#		else:
-#			return error(ERR_REQUEST)
-#	return error(ERR_CONN)
-
 func req(verb,adress,body1):
 	if(adress==""):
 		return error(ERR_ADRESS)
@@ -80,7 +55,6 @@ func req(verb,adress,body1):
 	var http = http_fullhost[0]
 	var fullhost = http_fullhost[1]
 	
-	#print(adress)
 	if(typeof(http)==TYPE_OBJECT):
 		var url = http_fullhost[2]
 		var err = http.request_raw(verb, url, dict_to_array(headers), body)
@@ -198,8 +172,6 @@ func checkServerConnection(adress,is_keep_alive):
 	else:
 		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
 
-
-# IF there is no body "" is returned else body
 func getResponse(http):
 
 	var rs = {}
@@ -211,12 +183,9 @@ func getResponse(http):
 	# Keep polling until the request is going on
 	while (http.get_status() == HTTPClient.STATUS_REQUESTING):
 		http.poll()
-		#print("read header")
-		#print("ich frage die datei an...")
 	
 	rs["code"] = http.get_response_code()
 	
-	#print(http.get_response_headers())
 	# If there is header content(more than first line)
 	if (http.has_response()):
 		# Get response headers
@@ -224,31 +193,21 @@ func getResponse(http):
 		
 		for key in headers:
 			rs["header"][key.to_lower()] = headers[key]
-		#rs["code"] = http.get_response_code()
-		#print(rs)
+
 		var cache = headers
-		#This method works for both anyway
+		
 		var rb = RawArray() #array that will hold the data
 		
-		#print(http.get_response_body_length())
 		while(http.get_status()==HTTPClient.STATUS_BODY):
 			http.set_read_chunk_size( http.get_response_body_length() )
 			rb += http.read_response_body_chunk()
-		#rb += http.read_response_body_chunk()
-		#print(http.get_status())
-		#print(rb.get_string_from_utf8())
+		
 		if("content-length" in rs["header"]):
-			#print(str("EMPFANGEN LENGHT:", rs["header"]["content-length"]))
 			rs["body"] = parse_body_to_var(rb, rs["header"]["content-type"])
-			#print(rs)
 		else:
 			rs["body"] = ""
-			#print("maybe chunked or error? chunked transfer not supported")
-		#print("http empfangen")
-		#print(rs)
 		return rs
 	else:
-		#print(rs)
 		return rs
 
 func parse_body_to_var(body, content_type):
