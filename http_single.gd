@@ -20,7 +20,8 @@ func error(code):
 func headers():
 	return {
 				"User-Agent": "Pirulo/1.0 (Godot)",
-				"Accept": "*/*"
+				"Accept": "*/*",
+				"connection": "keep-alive"
 			}
 
 func dict_to_array(dict):
@@ -37,6 +38,37 @@ var HTTPS = "https://"
 # TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
 # TODO ssl immer port 443???? nicht unbedingt oder?
 
+var http
+
+func connect(adress):
+
+	var uri_dict = get_link_address_port_path(adress)
+	
+	var serverAdress = uri_dict["host"]
+	var port = uri_dict["port"]
+	var path = uri_dict["path"]
+	var fullhost = uri_dict["fullhost"]
+		
+	var ssl = uri_dict["ssl"]
+	
+	http = HTTPClient.new() # Create the Client
+	
+	http.set_blocking_mode( true ) #wait untl all data is available on response
+
+	var err = http.connect(serverAdress,port,ssl) # Connect to host/port
+	
+	if(!err):
+		var start = OS.get_unix_time()
+		while( http.get_status()==HTTPClient.STATUS_CONNECTING or http.get_status()==HTTPClient.STATUS_RESOLVING):
+			if(OS.get_unix_time()-start>timeout_sec):
+				return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
+			else:
+				http.poll()
+		return [http,fullhost,path]
+	else:
+		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
+
+	
 func req(verb,adress,body1):
 	if(adress==""):
 		return error(ERR_ADRESS)
@@ -48,13 +80,12 @@ func req(verb,adress,body1):
 	if( headers==ERR_BODY ):
 		return error(ERR_BODY)
 	
-	var http_fullhost = checkServerConnection(adress)
-	var http = http_fullhost[0]
-	var fullhost = http_fullhost[1]
+	var uri_dict = get_link_address_port_path(adress)
+	
+	var path = uri_dict["path"]
 	
 	if(typeof(http)==TYPE_OBJECT):
-		var url = http_fullhost[2]
-		var err = http.request_raw(verb, url, dict_to_array(headers), body)
+		var err = http.request_raw(verb, path, dict_to_array(headers), body)
 		if(!err):
 			return getResponse(http)
 		else:
@@ -134,34 +165,6 @@ func get_link_address_port_path(uri):
 			#fragment missing
 			}
 
-func checkServerConnection(adress):
-
-	var uri_dict = get_link_address_port_path(adress)
-	
-	var serverAdress = uri_dict["host"]
-	var port = uri_dict["port"]
-	var path = uri_dict["path"]
-	var fullhost = uri_dict["fullhost"]
-
-	var ssl = uri_dict["ssl"]
-	
-	var http = HTTPClient.new() # Create the Client
-	
-	http.set_blocking_mode( true ) #wait untl all data is available on response
-
-	var err = http.connect(serverAdress,port,ssl) # Connect to host/port
-	
-	if(!err):
-		var start = OS.get_unix_time()
-		while( http.get_status()==HTTPClient.STATUS_CONNECTING or http.get_status()==HTTPClient.STATUS_RESOLVING):
-			if(OS.get_unix_time()-start>timeout_sec):
-				return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
-			else:
-				http.poll()
-		return [http,fullhost,path]
-	else:
-		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
-
 func getResponse(http):
 
 	var rs = {}
@@ -189,7 +192,7 @@ func getResponse(http):
 		var rb = RawArray() #array that will hold the data
 		
 		while(http.get_status()==HTTPClient.STATUS_BODY):
-			http.set_read_chunk_size( http.get_response_body_length() )
+			#http.set_read_chunk_size( http.get_response_body_length() )
 			rb += http.read_response_body_chunk()
 		
 		if("content-length" in rs["header"] && rs["header"]["content-length"]!="0"):
