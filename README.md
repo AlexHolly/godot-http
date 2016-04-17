@@ -1,4 +1,4 @@
-#TODO:
+##TODO:
 
  - HTTPS not supported.
  - sending raw_array not supported by godot master.
@@ -6,18 +6,18 @@
  - changing timeout and pass headers not supported.
  - headers are static inside the script.
 
-#Errors:
+##Errors:
 
-code on internal errors is always 404
+The error code on internal errors is always 404.
 
-	##response["body"] contains an error description
+The response["body"] contains an error description
 
 	"Parse Error unsupported body type"
 	"Connection error, can't reach host"
 	"Request failed, invalid params?"
 
 
-#How to use
+##How to use
 
 There are two versions.
 
@@ -44,15 +44,19 @@ http_single.gd - Is using one connection that is kept alive to gain some speed.C
 
 
 
-#Response is a Dictionary and contains the following fields
+##Response
 
-response["code"]
+The response is a Dictionary and contains the following fields.
 
-response["headers"]
+	response["code"]
 
-response["body"]
+	response["headers"]
 
-#The body is automatically transformed to an var there are 3 types supported as default
+	response["body"]
+
+##Body
+
+The body is automatically transformed to an var. Following types are supported as default
 
 	"application/json" - A Json String, will return a Dictionary 
 	"text/plain" - Simple text, will return a String
@@ -60,5 +64,4 @@ response["body"]
 	"bytestream" - A bytestream, that can contain any data(files,images,..), will return a RawArray()
 
 Headers don't need the Content-Length header, this is beeing added by godot HTTPClient.
-
 
