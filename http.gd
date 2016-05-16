@@ -1,5 +1,5 @@
 #author https://github.com/AlexHolly 
-#v0.5
+#v0.4
 extends Node
 
 var timeout_sec = 1

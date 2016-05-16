@@ -1,5 +1,5 @@
 #author https://github.com/AlexHolly 
-#v0.5
+#v0.4
 extends Node
 
 var timeout_sec = 1
@@ -16,13 +16,18 @@ func error(code):
 	rs["body"] = str(code)
 	rs["code"] = 404
 	return rs
-
-func headers():
+	
+func default_headers():
 	return {
 				"User-Agent": "Pirulo/1.0 (Godot)",
 				"Accept": "*/*",
 				"connection": "keep-alive"
 			}
+
+var headers = default_headers()
+
+func set_headers(_headers):
+	headers = _headers
 
 func dict_to_array(dict):
 	var rs = []
@@ -74,10 +79,10 @@ func req(verb,adress,body1):
 		return error(ERR_ADRESS)
 		
 	var headers_body = handle_body(body1)
-	var headers = headers_body[0]
+	var header = headers_body[0]
 	var body = headers_body[1]
 
-	if( headers==ERR_BODY ):
+	if( header==ERR_BODY ):
 		return error(ERR_BODY)
 	
 	var uri_dict = get_link_address_port_path(adress)
@@ -85,9 +90,9 @@ func req(verb,adress,body1):
 	var path = uri_dict["path"]
 	
 	if(typeof(http)==TYPE_OBJECT):
-		var err = http.request_raw(verb, path, dict_to_array(headers), body)
+		var err = http.request_raw(verb, path, dict_to_array(header), body)
 		if(!err):
-			return getResponse(http)
+			return getResponse()
 		else:
 			return error(ERR_REQUEST)
 	return error(ERR_CONN)
@@ -105,22 +110,22 @@ func delete(adress):
 	return req(HTTPClient.METHOD_DELETE, adress,RawArray())
 
 func handle_body(body):
-	var headers = headers()
+	var header = headers
 		
 	if(typeof(body)==TYPE_RAW_ARRAY):
 		if(body.size()>0):
-			headers["Content-Type"] = "bytestream"
-		return [headers,body]
+			header["Content-Type"] = "bytestream"
+		return [header,body]
 	elif(typeof(body)==TYPE_DICTIONARY):
 		if(!body.empty()):
-			headers["Content-Type"] = "application/json"
+			header["Content-Type"] = "application/json"
 			body = body.to_json().to_utf8()
-		return [headers,body]
+		return [header,body]
 	elif(typeof(body)==TYPE_STRING):
 		if(body.length()>0):
-			headers["Content-Type"] = "text/plain"
+			header["Content-Type"] = "text/plain"
 			body = body.to_utf8()
-		return [headers,body]
+		return [header,body]
 	else:
 		print("unsupported type")
 		return [ERR_BODY,ERR_BODY]
@@ -165,7 +170,7 @@ func get_link_address_port_path(uri):
 			#fragment missing
 			}
 
-func getResponse(http):
+func getResponse():
 
 	var rs = {}
 	
