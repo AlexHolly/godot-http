@@ -62,16 +62,16 @@ func req(verb,adress,body1):
 	return error(ERR_CONN)
 	
 func get(adress):
-	return req(HTTPClient.METHOD_GET,adress,RawArray())
+	return req(HTTPClient.METHOD_GET,adress,PoolByteArray())
 	
-func put(adress,body=RawArray([])):
+func put(adress,body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_PUT,adress,body)
 	
-func post(adress, body=RawArray([])):
+func post(adress, body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_POST,adress,body)
 	
 func delete(adress):
-	return req(HTTPClient.METHOD_DELETE, adress,RawArray())
+	return req(HTTPClient.METHOD_DELETE, adress,PoolByteArray())
 
 func handle_body(body):
 	var headers = headers()
@@ -83,7 +83,7 @@ func handle_body(body):
 	elif(typeof(body)==TYPE_DICTIONARY):
 		if(!body.empty()):
 			headers["Content-Type"] = "application/json"
-			body = body.to_json().to_utf8()
+			body = to_json(body).to_utf8()
 		return [headers,body]
 	elif(typeof(body)==TYPE_STRING):
 		if(body.length()>0):
@@ -149,7 +149,7 @@ func checkServerConnection(adress):
 	
 	http.set_blocking_mode( true ) #wait untl all data is available on response
 
-	var err = http.connect(serverAdress,port,ssl) # Connect to host/port
+	var err = http.connect_to_host(serverAdress,port,ssl) # Connect to host/port
 	
 	if(!err):
 		var start = OS.get_unix_time()
@@ -186,16 +186,17 @@ func getResponse(http):
 
 		var cache = headers
 		
-		var rb = RawArray() #array that will hold the data
+		var rb = PoolByteArray() #array that will hold the data
 		
 		while(http.get_status()==HTTPClient.STATUS_BODY):
-			http.set_read_chunk_size( http.get_response_body_length() )
+			#http.set_read_chunk_size( http.get_response_body_length() )
 			rb += http.read_response_body_chunk()
 		
 		if("content-length" in rs["header"] && rs["header"]["content-length"]!="0"):
 			rs["body"] = parse_body_to_var(rb, rs["header"]["content-type"])
 		else:
 			rs["body"] = ""
+		#print(rs)
 		return rs
 	else:
 		return rs
@@ -204,12 +205,11 @@ func parse_body_to_var(body, content_type):
 	
 	if(content_type.find("application/json")!=-1):
 		
-		var bodyDict = {}
 		body = body.get_string_from_utf8()
 		
 		#print(body)
-		
-		if( bodyDict.parse_json( body ) == 0 ):
+		var bodyDict = parse_json( body )
+		if( typeof(bodyDict) == TYPE_DICTIONARY):
 			body = bodyDict
 			print("make dict")
 		else:

@@ -43,8 +43,11 @@ var HTTPS = "https://"
 # TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
 # TODO ssl immer port 443???? nicht unbedingt oder?
 
-var http
+var http = HTTPClient.new() # Create the Client
 
+func set_connection(peer):
+	http.set_connection( peer )
+	
 func connect(adress):
 
 	var uri_dict = get_link_address_port_path(adress)
@@ -53,10 +56,8 @@ func connect(adress):
 	var port = uri_dict["port"]
 	var path = uri_dict["path"]
 	var fullhost = uri_dict["fullhost"]
-		
-	var ssl = uri_dict["ssl"]
 	
-	http = HTTPClient.new() # Create the Client
+	var ssl = uri_dict["ssl"]
 	
 	http.set_blocking_mode( true ) #wait untl all data is available on response
 
@@ -98,16 +99,16 @@ func req(verb,adress,body1):
 	return error(ERR_CONN)
 	
 func get(adress):
-	return req(HTTPClient.METHOD_GET,adress,RawArray())
+	return req(HTTPClient.METHOD_GET,adress,PoolByteArray())
 	
-func put(adress,body=RawArray([])):
+func put(adress,body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_PUT,adress,body)
 	
-func post(adress, body=RawArray([])):
+func post(adress, body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_POST,adress,body)
 	
 func delete(adress):
-	return req(HTTPClient.METHOD_DELETE, adress,RawArray())
+	return req(HTTPClient.METHOD_DELETE, adress,PoolByteArray())
 
 func handle_body(body):
 	var header = headers
