@@ -1,15 +1,18 @@
 #author https://github.com/AlexHolly 
-#v0.4
+#v0.5
 extends Node
-
-	
-var http = HTTPClient.new() # Create the Client
-var timeout_sec = 1
+ 
+var http = HTTPClient.new()
+var RESPONSE_TIMEOUT_IN_MS = 1000
 
 var ERR_ADRESS = "Invalid http request, maybe adress is empty?"
 var ERR_BODY = "Parse Error unsupported body"
 var ERR_CONN = "Connection error, can't reach host"
 var ERR_REQUEST = "Request failed, invalid params?"
+
+func _init():
+	# Init SSL Certificates
+	ProjectSettings.set("network/ssl/certificates", get_script().get_path().get_base_dir()+"/ca-certificates.crt")
 
 func error(code):
 	var rs = {}
@@ -17,43 +20,45 @@ func error(code):
 	rs["header"] = {}
 	rs["body"] = str(code)
 	rs["code"] = 404
+	
+	print(rs)
+	
 	return rs
 
+var headers =	{
+			"User-Agent": "Pirulo/1.0 (Godot)",
+			"Accept": "*/*"
+		}
+            
 func headers():
-	return {
-				"User-Agent": "Pirulo/1.0 (Godot)",
-				"Accept": "*/*"
-			}
+	return headers
 
 func dict_to_array(dict):
 	var rs = []
-	
+    
 	for key in dict:
 		rs.append(key + ": " + str(dict[key]))
 	return rs
-	
+    
 var HTTP = "http://"
 var HTTPS = "https://"
 
-# TODO Was machen mit players wie werden sie geupdated siehe board get players problem
-# TODO Asynchrone anfragen einbauen? Etwas komplizierter für anfragenden, muss call back funktion mit geben?
-# TODO ssl immer port 443???? nicht unbedingt oder?
-
-func req(verb, adress, body1):	
-		
+func req(verb, adress, body1):
+        
 	if(adress==""):
 		return error(ERR_ADRESS)
-		
+        
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
 
-	if( headers==ERR_BODY ):
+	if( typeof(headers)==TYPE_STRING ):
 		return error(ERR_BODY)
 	
 	var http_fullhost = checkServerConnection(adress)
 	var http = http_fullhost[0]
-	if(http.get_status()==HTTPClient.STATUS_CONNECTED):
+	
+	if(TYPE_INT != typeof(http) && http.get_status()==HTTPClient.STATUS_CONNECTED):
 		var fullhost = http_fullhost[1]
 		var url = http_fullhost[2]
 		var err = http.request_raw(verb, url, dict_to_array(headers), body)
@@ -63,22 +68,22 @@ func req(verb, adress, body1):
 		else:
 			return error(ERR_REQUEST)
 	return error(ERR_CONN)
-	
+    
 func get(adress):
 	return req(HTTPClient.METHOD_GET,adress,PoolByteArray())
-	
+    
 func put(adress,body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_PUT,adress,body)
-	
+    
 func post(adress, body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_POST,adress,body)
-	
+    
 func delete(adress):
 	return req(HTTPClient.METHOD_DELETE, adress,PoolByteArray())
 
 func handle_body(body):
 	var headers = headers()
-		
+        
 	if(typeof(body)==TYPE_RAW_ARRAY):
 		if(body.size()>0):
 			headers["Content-Type"] = "bytestream"
@@ -101,7 +106,7 @@ func get_link_address_port_path(uri):
 	var left = ""
 	var link = ""
 	var ssl = false
-	
+    
 	if(uri.begins_with(HTTPS)):
 		ssl = true
 		link = uri.replace(HTTPS, "")
@@ -109,25 +114,22 @@ func get_link_address_port_path(uri):
 	else:
 		link = uri.replace(HTTP, "")
 		left+=HTTP
-		
+        
 	var hostport = link.split("/", true)[0]
-	
+    
 	left+=hostport
-	
+    
 	var host_port = hostport.split(":", true)
 	var host = host_port[0]
-	
-	# TODO ssl immer port 443???? nicht unbedingt oder?
-	# TEST Falls kein port angegeben "" -> führt zu einem freeze 
-	# TODO check if https -> ssl/tls 443
+    	
 	var port = "80"
 	if(host_port.size()>1):
 		port = host_port[1]
-	if(uri.begins_with(HTTPS)):
+	if(uri.begins_with(HTTPS)):# check if https -> ssl/tls 443
 		port = "443"
-		
+
 	var path = uri.replace(left,"")
-	
+    
 	return {
 			"uri":uri, 
 			"host":host,
@@ -137,7 +139,7 @@ func get_link_address_port_path(uri):
 			"fullhost":hostport
 			#query missing
 			#fragment missing
-			}
+		}
 
 func checkServerConnection(adress):
 
@@ -147,46 +149,58 @@ func checkServerConnection(adress):
 	var port = uri_dict["port"]
 	var path = uri_dict["path"]
 	var fullhost = uri_dict["fullhost"]
-
+	
 	var ssl = uri_dict["ssl"]
 	
-	http.set_blocking_mode( true ) #wait untl all data is available on response
-
-	var err = http.connect_to_host(serverAdress,port,ssl) # Connect to host/port
+	#http.set_blocking_mode( true ) #wait until all data is available on response
+	
+	var err = http.connect_to_host(serverAdress,port,ssl)
 	
 	if(!err):
-		var start = OS.get_unix_time()
-		while( http.get_status()==HTTPClient.STATUS_CONNECTING or http.get_status()==HTTPClient.STATUS_RESOLVING):
-			if(OS.get_unix_time()-start>timeout_sec):
-				return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
-			else:
-				http.poll()
-		return [http,fullhost,path]
+		var start_time_in_ms = OS.get_ticks_msec()
+		while( (http.get_status()==HTTPClient.STATUS_CONNECTING or
+				http.get_status()==HTTPClient.STATUS_RESOLVING) &&
+				(OS.get_ticks_msec()-start_time_in_ms)<RESPONSE_TIMEOUT_IN_MS):
+			http.poll()
+
+		if((OS.get_ticks_msec()-start_time_in_ms)>=RESPONSE_TIMEOUT_IN_MS): # TIMEOUT
+			return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
+		else:
+			return [http,fullhost,path]
 	else:
 		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
 
-func getResponse(http):
 
+func getResponse(http):
+	
 	var rs = {}
 	
 	rs["header"] = {}
 	rs["body"] = ""
 	rs["code"] = 404
 	
-	# Keep polling until the request is going on
-	while (http.get_status() == HTTPClient.STATUS_REQUESTING):
+	# Keep polling until the request is going on - in some cases the server will not respond I will add a timeout
+	var start_time_in_ms = OS.get_ticks_msec()
+	while (	(http.get_status() != HTTPClient.STATUS_DISCONNECTED) && 
+		(http.get_status() == HTTPClient.STATUS_REQUESTING) &&
+		((OS.get_ticks_msec()-start_time_in_ms)<RESPONSE_TIMEOUT_IN_MS)):
 		http.poll()
 	
-	rs["code"] = http.get_response_code()
+	if(http.get_status() == HTTPClient.STATUS_DISCONNECTED):
+		return error("HTTP DC")
+    
+	if((OS.get_ticks_msec()-start_time_in_ms)>=RESPONSE_TIMEOUT_IN_MS):
+		return error("TIMEOUT")
 	
-	# If there is header content(more than first line)
+	rs["code"] = http.get_response_code()
+
 	if (http.has_response()):
 		# Get response headers
 		var headers = http.get_response_headers_as_dictionary()
 		
 		for key in headers:
 			rs["header"][key.to_lower()] = headers[key]
-
+		
 		var cache = headers
 		
 		var rb = PoolByteArray() #array that will hold the data
@@ -199,27 +213,28 @@ func getResponse(http):
 			rs["body"] = parse_body_to_var(rb, rs["header"]["content-type"])
 		else:
 			rs["body"] = ""
-		#print(rs)
+		
 		return rs
 	else:
+		if http.get_status()==HTTPClient.STATUS_CONNECTION_ERROR:
+			print("Maybe Certificates no set in project_settings/network/ssl/")
+			breakpoint
 		return rs
 
 func parse_body_to_var(body, content_type):
-	
+    
 	if(content_type.find("application/json")!=-1):
-		
+        
 		body = body.get_string_from_utf8()
-		
-		#print(body)
 		var bodyDict = parse_json( body )
+
 		if( typeof(bodyDict) == TYPE_DICTIONARY):
 			body = bodyDict
-			print("make dict")
 		else:
-			print("Error beim body to dict json wandel")
-		
+			print("Error on convert body to dict json")
+        
 	elif(content_type.find("text/plain")!=-1||content_type.find("text/html")!=-1):
 		body = body.get_string_from_utf8()
 	elif(content_type.find("bytestream")!=-1):
-		pass#return body
+		pass #return body
 	return body
