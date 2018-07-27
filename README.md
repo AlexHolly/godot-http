@@ -1,4 +1,4 @@
-##TODO:
+## TODO:
 
  - HTTPS not supported.
  - sending raw_array not supported by godot master.
@@ -6,7 +6,7 @@
  - changing timeout and pass headers not supported.
  - headers are static inside the script.
 
-##Errors:
+## Errors:
 
 The error code on internal errors is always 404.
 
@@ -16,7 +16,7 @@ The response["body"] contains an error description
 	"Connection error, can't reach host"
 	"Request failed, invalid params?"
 
-##How to use
+## How to use
 
 There are two versions.
 
@@ -33,7 +33,7 @@ http.gd - Is creating a connection for each request.
 	var response = http.delete(url)
 
 
-##Response
+## Response
 
 The response is a Dictionary and contains the following fields.
 
@@ -43,7 +43,7 @@ The response is a Dictionary and contains the following fields.
 
 	response["body"]
 
-##Body
+## Body
 
 The body is automatically transformed to an var. Following types are supported as default
 

@@ -1,5 +1,5 @@
 #author https://github.com/AlexHolly 
-#v0.5
+#v0.6
 extends Node
  
 var http = HTTPClient.new()
@@ -10,10 +10,11 @@ var ERR_BODY = "Parse Error unsupported body"
 var ERR_CONN = "Connection error, can't reach host"
 var ERR_REQUEST = "Request failed, invalid params?"
 
-func _init():
-	# Init SSL Certificates
-	ProjectSettings.set("network/ssl/certificates", get_script().get_path().get_base_dir()+"/ca-certificates.crt")
-
+#func _init():
+	# Init SSL Certificates - Is broken in master
+	# Add manually in Menu Project->Network->ssl
+	# ProjectSettings.set("network/ssl/certificates", get_script().get_path().get_base_dir()+"/ca-certificates.crt")
+	
 func error(code):
 	var rs = {}
 	
@@ -83,23 +84,25 @@ func delete(adress):
 
 func handle_body(body):
 	var headers = headers()
-        
-	if(typeof(body)==TYPE_RAW_ARRAY):
+	var type = typeof(body)
+	if(type==TYPE_RAW_ARRAY):
 		if(body.size()>0):
 			headers["Content-Type"] = "bytestream"
 		return [headers,body]
-	elif(typeof(body)==TYPE_DICTIONARY):
+	elif(type==TYPE_DICTIONARY):
 		if(!body.empty()):
 			headers["Content-Type"] = "application/json"
 			body = to_json(body).to_utf8()
 		return [headers,body]
-	elif(typeof(body)==TYPE_STRING):
+	elif(type==TYPE_STRING):
 		if(body.length()>0):
 			headers["Content-Type"] = "text/plain"
 			body = body.to_utf8()
 		return [headers,body]
+	elif(type==TYPE_NIL):
+		return [headers, "".to_utf8()]
 	else:
-		print("unsupported type")
+		print("unsupported type:" + str(type))
 		return [ERR_BODY,ERR_BODY]
 
 func get_link_address_port_path(uri):
@@ -227,11 +230,13 @@ func parse_body_to_var(body, content_type):
         
 		body = body.get_string_from_utf8()
 		var bodyDict = parse_json( body )
-
+		#print(bodyDict)
 		if( typeof(bodyDict) == TYPE_DICTIONARY):
 			body = bodyDict
+		elif( typeof(bodyDict) == TYPE_ARRAY && bodyDict.size()>0):
+			body = bodyDict[0]
 		else:
-			print("Error on convert body to dict json")
+			print("Error body incompatible content_type: " + str(typeof(bodyDict)))
         
 	elif(content_type.find("text/plain")!=-1||content_type.find("text/html")!=-1):
 		body = body.get_string_from_utf8()
