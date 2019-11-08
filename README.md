@@ -3,7 +3,7 @@
  - HTTPS not supported.
  - sending raw_array not supported by godot master.
  - change default transformation not supported.
- - changing timeout and pass headers not supported.
+ - pass headers not supported.
  - headers are static inside the script.
 
 ## Errors:
@@ -18,9 +18,7 @@ The response["body"] contains an error description
 
 ## How to use
 
-There are two versions.
-
-http.gd - Is creating a connection for each request.
+Is creating a connection for each request and block until response arrives.
 	
 	var http = load("res://http.gd").new()
 
@@ -32,6 +30,22 @@ http.gd - Is creating a connection for each request.
 
 	var response = http.delete(url)
 
+Async - Is creating a connection and thread for each request.
+	
+	var http = load("res://http.gd").new()
+
+	var ref = funcref(self, "_send")
+
+	http.getAsync(url, ref)
+
+	http.putAsync(url, ref, body) # body can be String or RawArray
+
+	http.postAsync(url, ref, body) # body can be String or RawArray
+
+	http.deleteAsync(url, ref)
+
+	func _send(response):
+		pass
 
 ## Response
 
@@ -45,7 +59,7 @@ The response is a Dictionary and contains the following fields.
 
 ## Body
 
-The body is automatically transformed to an var. Following types are supported as default
+The body is automatically transformed to a 'Variant', following types are supported by default:
 
 	"application/json" - A Json String, will return a Dictionary 
 	"text/plain" - Simple text, will return a String

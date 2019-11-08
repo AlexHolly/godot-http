@@ -1,9 +1,8 @@
-#author https://github.com/AlexHolly 
-#v0.6
+# author https://github.com/AlexHolly 
+# v0.7
 extends Node
- 
-var http = HTTPClient.new()
-var RESPONSE_TIMEOUT_IN_MS = 1000
+
+var RESPONSE_TIMEOUT_IN_MS = 30 * 1000 * 60 
 
 var ERR_ADRESS = "Invalid http request, maybe adress is empty?"
 var ERR_BODY = "Parse Error unsupported body"
@@ -26,29 +25,29 @@ func error(code):
 	
 	return rs
 
-var headers =	{
-			"User-Agent": "Pirulo/1.0 (Godot)",
-			"Accept": "*/*"
-		}
-            
+var _headers = {
+	"User-Agent": "Pirulo/1.0 (Godot)",
+	"Accept": "*/*"
+}
+
 func headers():
-	return headers
+	return _headers
 
 func dict_to_array(dict):
 	var rs = []
-    
+	
 	for key in dict:
 		rs.append(key + ": " + str(dict[key]))
 	return rs
-    
+	
 var HTTP = "http://"
 var HTTPS = "https://"
 
 func req(verb, adress, body1):
-        
+	
 	if(adress==""):
 		return error(ERR_ADRESS)
-        
+		
 	var headers_body = handle_body(body1)
 	var headers = headers_body[0]
 	var body = headers_body[1]
@@ -57,30 +56,56 @@ func req(verb, adress, body1):
 		return error(ERR_BODY)
 	
 	var http_fullhost = checkServerConnection(adress)
-	var http = http_fullhost[0]
+	var _http = http_fullhost[0]
 	
-	if(TYPE_INT != typeof(http) && http.get_status()==HTTPClient.STATUS_CONNECTED):
-		var fullhost = http_fullhost[1]
+	if(TYPE_INT != typeof(_http) && _http.get_status()==HTTPClient.STATUS_CONNECTED):
+		# var fullhost = http_fullhost[1]
 		var url = http_fullhost[2]
-		var err = http.request_raw(verb, url, dict_to_array(headers), body)
+		var err = _http.request_raw(verb, url, dict_to_array(headers), body)
 		
 		if(!err):
-			return getResponse(http)
+			return getResponse(_http)
 		else:
 			return error(ERR_REQUEST)
 	return error(ERR_CONN)
-    
+	
 func get(adress):
-	return req(HTTPClient.METHOD_GET,adress,PoolByteArray())
-    
-func put(adress,body=PoolByteArray([])):
-	return req(HTTPClient.METHOD_PUT,adress,body)
-    
+	return req(HTTPClient.METHOD_GET, adress, PoolByteArray())
+	
+func put(adress, body=PoolByteArray([])):
+	return req(HTTPClient.METHOD_PUT, adress, body)
+	
 func post(adress, body=PoolByteArray([])):
-	return req(HTTPClient.METHOD_POST,adress,body)
-    
+	return req(HTTPClient.METHOD_POST, adress, body)
+	
 func delete(adress):
-	return req(HTTPClient.METHOD_DELETE, adress,PoolByteArray())
+	return req(HTTPClient.METHOD_DELETE, adress, PoolByteArray())
+
+var threads = []
+func thread(verb, adress, function, body1):
+	threads.push_back(Thread.new())
+	var args = [verb, adress, body1, function]
+	threads[threads.size()-1].start(self, "reqAsync", args)
+
+func reqAsync(args):
+	var verb = args[0]
+	var adress = args[1]
+	var body1 = args[2]
+	var function = args[3]
+	
+	function.call_func(req(verb, adress, body1))
+	
+func getAsync(adress, function):
+	return thread(HTTPClient.METHOD_GET, adress, function, PoolByteArray())
+	
+func putAsync(adress, function, body=PoolByteArray([])):
+	return thread(HTTPClient.METHOD_PUT, adress, function, body)
+	
+func postAsync(adress, function, body=PoolByteArray([])):
+	return thread(HTTPClient.METHOD_POST, adress, function, body)
+	
+func deleteAsync(adress, function):
+	return thread(HTTPClient.METHOD_DELETE, adress, function, PoolByteArray())
 
 func handle_body(body):
 	var headers = headers()
@@ -109,7 +134,7 @@ func get_link_address_port_path(uri):
 	var left = ""
 	var link = ""
 	var ssl = false
-    
+	
 	if(uri.begins_with(HTTPS)):
 		ssl = true
 		link = uri.replace(HTTPS, "")
@@ -117,14 +142,14 @@ func get_link_address_port_path(uri):
 	else:
 		link = uri.replace(HTTP, "")
 		left+=HTTP
-        
+		
 	var hostport = link.split("/", true)[0]
-    
+	
 	left+=hostport
-    
+	
 	var host_port = hostport.split(":", true)
 	var host = host_port[0]
-    	
+		
 	var port = "80"
 	if(host_port.size()>1):
 		port = host_port[1]
@@ -132,7 +157,7 @@ func get_link_address_port_path(uri):
 		port = "443"
 
 	var path = uri.replace(left,"")
-    
+	
 	return {
 			"uri":uri, 
 			"host":host,
@@ -155,9 +180,10 @@ func checkServerConnection(adress):
 	
 	var ssl = uri_dict["ssl"]
 	
-	#http.set_blocking_mode( true ) #wait until all data is available on response
+	var http = HTTPClient.new()
+	http.set_blocking_mode( true ) #wait until all data is available on response
 	
-	var err = http.connect_to_host(serverAdress,port,ssl)
+	var err = http.connect_to_host(serverAdress, port, ssl)
 	
 	if(!err):
 		var start_time_in_ms = OS.get_ticks_msec()
@@ -167,14 +193,13 @@ func checkServerConnection(adress):
 			http.poll()
 
 		if((OS.get_ticks_msec()-start_time_in_ms)>=RESPONSE_TIMEOUT_IN_MS): # TIMEOUT
-			return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
+			return [HTTPClient.STATUS_CANT_CONNECT, fullhost]
 		else:
-			return [http,fullhost,path]
+			return [http, fullhost, path]
 	else:
-		return [HTTPClient.STATUS_CANT_CONNECT,fullhost]
+		return [HTTPClient.STATUS_CANT_CONNECT, fullhost]
 
-
-func getResponse(http):
+func getResponse(_http):
 	
 	var rs = {}
 	
@@ -184,33 +209,33 @@ func getResponse(http):
 	
 	# Keep polling until the request is going on - in some cases the server will not respond I will add a timeout
 	var start_time_in_ms = OS.get_ticks_msec()
-	while (	(http.get_status() != HTTPClient.STATUS_DISCONNECTED) && 
-		(http.get_status() == HTTPClient.STATUS_REQUESTING) &&
+	while (	(_http.get_status() != HTTPClient.STATUS_DISCONNECTED) && 
+		(_http.get_status() == HTTPClient.STATUS_REQUESTING) &&
 		((OS.get_ticks_msec()-start_time_in_ms)<RESPONSE_TIMEOUT_IN_MS)):
-		http.poll()
+		_http.poll()
 	
-	if(http.get_status() == HTTPClient.STATUS_DISCONNECTED):
+	if(_http.get_status() == HTTPClient.STATUS_DISCONNECTED):
 		return error("HTTP DC")
-    
+	
 	if((OS.get_ticks_msec()-start_time_in_ms)>=RESPONSE_TIMEOUT_IN_MS):
 		return error("TIMEOUT")
 	
-	rs["code"] = http.get_response_code()
+	rs["code"] = _http.get_response_code()
 
-	if (http.has_response()):
+	if (_http.has_response()):
 		# Get response headers
-		var headers = http.get_response_headers_as_dictionary()
+		var headers = _http.get_response_headers_as_dictionary()
 		
 		for key in headers:
 			rs["header"][key.to_lower()] = headers[key]
 		
-		var cache = headers
+		# var cache = headers
 		
 		var rb = PoolByteArray() #array that will hold the data
 		
-		while(http.get_status()==HTTPClient.STATUS_BODY):
-			#http.set_read_chunk_size( http.get_response_body_length() )
-			rb += http.read_response_body_chunk()
+		while(_http.get_status()==HTTPClient.STATUS_BODY):
+			#_http.set_read_chunk_size( _http.get_response_body_length() )
+			rb += _http.read_response_body_chunk()
 		
 		if("content-length" in rs["header"] && rs["header"]["content-length"]!="0"):
 			rs["body"] = parse_body_to_var(rb, rs["header"]["content-type"])
@@ -219,25 +244,26 @@ func getResponse(http):
 		
 		return rs
 	else:
-		if http.get_status()==HTTPClient.STATUS_CONNECTION_ERROR:
+		if _http.get_status()==HTTPClient.STATUS_CONNECTION_ERROR:
 			print("Maybe Certificates no set in project_settings/network/ssl/")
 			breakpoint
 		return rs
 
 func parse_body_to_var(body, content_type):
-    
 	if(content_type.find("application/json")!=-1):
-        
 		body = body.get_string_from_utf8()
+		#print(body)
 		var bodyDict = parse_json( body )
 		#print(bodyDict)
 		if( typeof(bodyDict) == TYPE_DICTIONARY):
 			body = bodyDict
-		elif( typeof(bodyDict) == TYPE_ARRAY && bodyDict.size()>0):
-			body = bodyDict[0]
+		elif( typeof(bodyDict) == TYPE_ARRAY):
+			body = bodyDict
+		elif(body=="null"):
+			body = {}
 		else:
 			print("Error body incompatible content_type: " + str(typeof(bodyDict)))
-        
+		
 	elif(content_type.find("text/plain")!=-1||content_type.find("text/html")!=-1):
 		body = body.get_string_from_utf8()
 	elif(content_type.find("bytestream")!=-1):
