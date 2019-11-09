@@ -1,5 +1,5 @@
 # author https://github.com/AlexHolly 
-# v0.7
+# v0.8
 extends Node
 
 var RESPONSE_TIMEOUT_IN_MS = 30 * 1000 * 60 
@@ -68,33 +68,44 @@ func req(verb, adress, body1):
 		else:
 			return error(ERR_REQUEST)
 	return error(ERR_CONN)
-	
+
+#var http # sync can only have one / blocks
+# TODO all requests should be async
+# 1. The ui will block and multiple sync http connections are not possbile anyway
+# 2. The multiple http connections are useless, and returning the http connection to close it is not possible
 func get(adress):
 	return req(HTTPClient.METHOD_GET, adress, PoolByteArray())
-	
+
 func put(adress, body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_PUT, adress, body)
-	
+
 func post(adress, body=PoolByteArray([])):
 	return req(HTTPClient.METHOD_POST, adress, body)
-	
+
 func delete(adress):
 	return req(HTTPClient.METHOD_DELETE, adress, PoolByteArray())
 
-var threads = []
 func thread(verb, adress, function, body1):
-	threads.push_back(Thread.new())
-	var args = [verb, adress, body1, function]
-	threads[threads.size()-1].start(self, "reqAsync", args)
+	var thread = Thread.new()
+	var args = [verb, adress, body1, function, thread]
+	thread.start(self, "reqAsync", args)
+	return thread
+
+var requests = {}
+func stop_async(thread):
+	if(requests.has(thread)):
+		requests[thread].close()
 
 func reqAsync(args):
 	var verb = args[0]
 	var adress = args[1]
 	var body1 = args[2]
 	var function = args[3]
+	var thread = args[4]
 	
-	function.call_func(req(verb, adress, body1))
-	
+	function.call_func(req( verb, adress, body1))
+	requests.erase(thread)
+
 func getAsync(adress, function):
 	return thread(HTTPClient.METHOD_GET, adress, function, PoolByteArray())
 	
@@ -180,22 +191,22 @@ func checkServerConnection(adress):
 	
 	var ssl = uri_dict["ssl"]
 	
-	var http = HTTPClient.new()
-	http.set_blocking_mode( true ) #wait until all data is available on response
+	var _http = HTTPClient.new()
+	_http.set_blocking_mode( true ) #wait until all data is available on response
 	
-	var err = http.connect_to_host(serverAdress, port, ssl)
+	var err = _http.connect_to_host(serverAdress, port, ssl)
 	
 	if(!err):
 		var start_time_in_ms = OS.get_ticks_msec()
-		while( (http.get_status()==HTTPClient.STATUS_CONNECTING or
-				http.get_status()==HTTPClient.STATUS_RESOLVING) &&
+		while( (_http.get_status()==HTTPClient.STATUS_CONNECTING or
+				_http.get_status()==HTTPClient.STATUS_RESOLVING) &&
 				(OS.get_ticks_msec()-start_time_in_ms)<RESPONSE_TIMEOUT_IN_MS):
-			http.poll()
+			_http.poll()
 
 		if((OS.get_ticks_msec()-start_time_in_ms)>=RESPONSE_TIMEOUT_IN_MS): # TIMEOUT
 			return [HTTPClient.STATUS_CANT_CONNECT, fullhost]
 		else:
-			return [http, fullhost, path]
+			return [_http, fullhost, path]
 	else:
 		return [HTTPClient.STATUS_CANT_CONNECT, fullhost]
 
@@ -209,7 +220,7 @@ func getResponse(_http):
 	
 	# Keep polling until the request is going on - in some cases the server will not respond I will add a timeout
 	var start_time_in_ms = OS.get_ticks_msec()
-	while (	(_http.get_status() != HTTPClient.STATUS_DISCONNECTED) && 
+	while ((_http.get_status() != HTTPClient.STATUS_DISCONNECTED) && 
 		(_http.get_status() == HTTPClient.STATUS_REQUESTING) &&
 		((OS.get_ticks_msec()-start_time_in_ms)<RESPONSE_TIMEOUT_IN_MS)):
 		_http.poll()
@@ -269,3 +280,4 @@ func parse_body_to_var(body, content_type):
 	elif(content_type.find("bytestream")!=-1):
 		pass #return body
 	return body
+
